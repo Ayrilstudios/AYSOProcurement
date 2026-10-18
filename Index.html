@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">A</span><div><strong>AYSO</strong><small>PROCUREMENT</small></div></div>
+      <nav>
+        <button class="nav-item active" data-view="dashboard">Overview</button>
+        <button class="nav-item" data-view="requests">Requests</button>
+        <button class="nav-item" data-view="approvals">Approvals</button>
+        <button class="nav-item" data-view="suppliers">Suppliers</button>
+        <button class="nav-item" data-view="purchase-orders">Purchase orders</button>
+      </nav>
+      <div class="sidebar-foot">Enterprise Operations<br><span>Procurement workspace</span></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div><p class="eyebrow">WORKSPACE / PROCUREMENT</p><h1 id="page-title">Overview</h1></div><div id="user-chip" class="user-chip">Checking access…</div></header>
+      <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
+      <section id="dashboard-view" class="view">
+        <div class="welcome"><div><p class="eyebrow">OPERATIONS SNAPSHOT</p><h2>Procurement overview</h2><p class="muted">Track requests, approvals, and purchasing activity.</p></div><button class="primary" id="new-request-btn">+ New request</button></div>
+        <div class="metrics" id="metrics"><div class="metric"><span>Total requests</span><strong>—</strong></div><div class="metric"><span>Pending approval</span><strong>—</strong></div><div class="metric"><span>Approved</span><strong>—</strong></div><div class="metric"><span>Rejected</span><strong>—</strong></div></div>
+        <div class="panel"><div class="panel-head"><div><h3>Recent requests</h3><p class="muted">Latest activity visible to your account</p></div><button class="quiet" data-view="requests">View all →</button></div><div id="recent-requests" class="table-wrap"></div></div>
+      </section>
+      <section id="requests-view" class="view hidden"><div class="panel"><div class="panel-head"><div><h3>Procurement requests</h3><p class="muted">Requests available to your account</p></div><button class="primary" id="new-request-btn-2">+ New request</button></div><div id="requests-table" class="table-wrap"></div></div></section>
+      <section id="approvals-view" class="view hidden"><div class="panel"><div class="panel-head"><div><h3>Approval queue</h3><p class="muted">Tasks assigned to your account</p></div><button class="quiet" id="refresh-approvals">Refresh</button></div><div id="approvals-table" class="table-wrap"></div></div></section>
+      <section id="suppliers-view" class="view hidden"><div class="panel"><div class="panel-head"><div><h3>Suppliers</h3><p class="muted">Approved supplier directory</p></div><button class="primary" id="new-supplier-btn">+ Add supplier</button></div><div id="suppliers-table" class="table-wrap"></div></div></section>
+      <section id="purchase-orders-view" class="view hidden"><div class="panel"><div class="panel-head"><div><h3>Purchase orders</h3><p class="muted">Orders created from approved requests</p></div><button class="quiet" id="refresh-pos">Refresh</button></div><div id="pos-table" class="table-wrap"></div></div></section>
+      <footer>AYSO Procurement <span>·</span> Foundation release 1.0</footer>
+    </main>
+  </div>
+  <dialog id="request-dialog" class="modal">
+    <form id="request-form" class="modal-form">
+      <div class="modal-head"><div><p class="eyebrow">NEW WORKFLOW ITEM</p><h2>Submit procurement request</h2></div><button type="button" class="icon-btn" data-close="request-dialog" aria-label="Close">×</button></div>
+      <label>Request title<input name="title" maxlength="160" required></label>
+      <div class="form-grid"><label>Category<input name="category" maxlength="80" required placeholder="e.g. IT equipment"></label><label>Required by<input name="requiredBy" type="date" required></label></div>
+      <div class="form-grid"><label>Quantity<input name="quantity" type="number" min="1" step="1" required></label><label>Estimated unit cost<input name="estimatedUnitCost" type="number" min="0" step="0.01" required></label></div>
+      <div class="form-grid"><label>Currency<select name="currency"><option>IDR</option><option>USD</option><option>SGD</option><option>EUR</option></select></label><label>Business justification<input name="justification" maxlength="2000" required></label></div>
+      <label>Description<textarea name="description" rows="3"></textarea></label>
+      <div class="modal-actions"><button type="button" class="quiet" data-close="request-dialog">Cancel</button><button class="primary" type="submit">Submit request</button></div>
+    </form>
+  </dialog>
+  <dialog id="supplier-dialog" class="modal">
+    <form id="supplier-form" class="modal-form">
+      <div class="modal-head"><div><p class="eyebrow">SUPPLIER DIRECTORY</p><h2>Add supplier</h2></div><button type="button" class="icon-btn" data-close="supplier-dialog" aria-label="Close">×</button></div>
+      <label>Supplier name<input name="supplierName" required maxlength="180"></label>
+      <div class="form-grid"><label>Contact name<input name="contactName"></label><label>Email<input name="email" type="email"></label></div>
+      <div class="form-grid"><label>Phone<input name="phone"></label><label>Payment terms<input name="paymentTerms" placeholder="e.g. Net 30"></label></div>
+      <label>Address<textarea name="address" rows="2"></textarea></label>
+      <div class="modal-actions"><button type="button" class="quiet" data-close="supplier-dialog">Cancel</button><button class="primary" type="submit">Save supplier</button></div>
+    </form>
+  </dialog>
+  <?!= include('Scripts'); ?>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<script>
+(function(){
+  'use strict';
+  const $ = (s, root=document) => root.querySelector(s);
+  const $$ = (s, root=document) => Array.from(root.querySelectorAll(s));
+  let appUser = null;
+  function callServer(name, ...args) {
+    return new Promise((resolve,reject) => {
+      google.script.run.withSuccessHandler(result => {
+        if (!result || !result.ok) reject(new Error(result && result.error || 'Request failed.'));
+        else resolve(result.data);
+      }).withFailureHandler(() => reject(new Error('The server could not complete the request. Please retry.')))[name](...args);
+    });
+  }
+  function showNotice(message, error=false) {
+    const el=$('#notice'); el.textContent=message; el.classList.remove('hidden','error');
+    if(error) el.classList.add('error');
+    window.setTimeout(()=>el.classList.add('hidden'),5500);
+  }
+  function escapeHtml(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function status(v){return '<span class="status '+escapeHtml(v)+'">'+escapeHtml(String(v||'—').replaceAll('_',' '))+'</span>';}
+  function renderTable(target, headers, rows) {
+    const el=$(target);
+    if(!rows.length){el.innerHTML='<div class="empty">No records to display.</div>';return;}
+    el.innerHTML='<table><thead><tr>'+headers.map(h=>'<th>'+escapeHtml(h.label)+'</th>').join('')+'</tr></thead><tbody>'+
+      rows.map(r=>'<tr>'+headers.map(h=>'<td>'+(h.render?h.render(r):escapeHtml(r[h.key]||'—'))+'</td>').join('')+'</tr>').join('')+
+      '</tbody></table>';
+  }
+  function showView(view) {
+    $$('.view').forEach(el=>el.classList.add('hidden'));
+    const target=$('#'+view+'-view'); if(target) target.classList.remove('hidden');
+    $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+    const labels={dashboard:'Overview',requests:'Requests',approvals:'Approvals',suppliers:'Suppliers','purchase-orders':'Purchase orders'};
+    $('#page-title').textContent=labels[view]||'Overview';
+    if(view==='requests') loadRequests();
+    if(view==='approvals') loadApprovals();
+    if(view==='suppliers') loadSuppliers();
+    if(view==='purchase-orders') loadPOs();
+  }
+  async function loadDashboard() {
+    const d=await callServer('getDashboardSummary');
+    const metrics=[['Total requests',d.totalRequests],['Pending approval',d.pendingApproval],['Approved',d.approved],['Rejected',d.rejected]];
+    $('#metrics').innerHTML=metrics.map(m=>'<div class="metric"><span>'+m[0]+'</span><strong>'+m[1]+'</strong></div>').join('');
+    renderTable('#recent-requests',[{label:'Request',key:'requestNumber'},{label:'Title',key:'title'},{label:'Required by',key:'requiredBy'},{label:'Status',key:'status',render:r=>status(r.status)}],d.recentRequests||[]);
+  }
+  async function loadRequests() {
+    try {const rows=await callServer('listRequests');renderTable('#requests-table',[{label:'Request',key:'requestNumber'},{label:'Title',key:'title'},{label:'Category',key:'category'},{label:'Required by',key:'requiredBy'},{label:'Estimate',render:r=>escapeHtml(r.currency)+' '+Number(r.estimatedUnitCost*r.quantity||0).toLocaleString()},{label:'Status',key:'status',render:r=>status(r.status)}],rows);}
+    catch(e){showNotice(e.message,true);}
+  }
+  async function loadApprovals() {
+    try {const rows=await callServer('listMyApprovals');renderTable('#approvals-table',[{label:'Request',render:r=>escapeHtml(r.request?r.request.requestNumber:r.requestId)},{label:'Title',render:r=>escapeHtml(r.request?r.request.title:'Request unavailable')},{label:'Decision',key:'decision',render:r=>status(r.decision)},{label:'Action',render:r=>r.decision==='PENDING'?'<button class="quiet" data-approve="'+escapeHtml(r.approvalId)+'">Review</button>':'—'}],rows);}
+    catch(e){showNotice(e.message,true);}
+  }
+  async function loadSuppliers() {
+    try {const rows=await callServer('listSuppliers');renderTable('#suppliers-table',[{label:'Supplier',key:'supplierName'},{label:'Code',key:'supplierCode'},{label:'Contact',key:'contactName'},{label:'Email',key:'email'},{label:'Payment terms',key:'paymentTerms'},{label:'Status',key:'status',render:r=>status(r.status)}],rows);}
+    catch(e){showNotice(e.message,true);}
+  }
+  async function loadPOs() {
+    try {const rows=await callServer('listPurchaseOrders');renderTable('#pos-table',[{label:'PO number',key:'poNumber'},{label:'Request ID',key:'requestId'},{label:'Order date',key:'orderDate'},{label:'Total',render:r=>escapeHtml(r.currency)+' '+Number(r.totalAmount||0).toLocaleString()},{label:'Status',key:'status',render:r=>status(r.status)}],rows);}
+    catch(e){showNotice(e.message,true);}
+  }
+  function openDialog(id){const d=$('#'+id); if(d && d.showModal)d.showModal();}
+  function closeDialog(id){const d=$('#'+id);if(d)d.close();}
+  function formObject(form){return Object.fromEntries(new FormData(form).entries());}
+  async function boot(){
+    try {
+      const data=await callServer('getAppBootstrap');appUser=data.user;
+      $('#user-chip').textContent=(appUser.name||appUser.email)+' · '+appUser.role;
+      await loadDashboard();
+      if(!['ADMIN','PROCUREMENT','APPROVER'].includes(String(appUser.role).toUpperCase())) {
+        $$('[data-view="approvals"],[data-view="suppliers"],[data-view="purchase-orders"]').forEach(el=>el.classList.add('hidden'));
+        $('#new-supplier-btn').classList.add('hidden');
+      }
+    } catch(e) {
+      $('#user-chip').textContent='Access unavailable';
+      showNotice(e.message,true);
+      $('#dashboard-view').innerHTML='<div class="panel"><h3>Unable to load workspace</h3><p class="muted">'+escapeHtml(e.message)+'</p><p class="muted">Ask an administrator to confirm deployment access and that your email exists as an ACTIVE user in the Users sheet.</p></div>';
+    }
+  }
+  document.addEventListener('click',async e=>{
+    const nav=e.target.closest('[data-view]');if(nav){showView(nav.dataset.view);return;}
+    const close=e.target.closest('[data-close]');if(close){closeDialog(close.dataset.close);return;}
+    if(e.target.closest('#new-request-btn,#new-request-btn-2')){openDialog('request-dialog');return;}
+    if(e.target.closest('#new-supplier-btn')){openDialog('supplier-dialog');return;}
+    if(e.target.closest('#refresh-approvals')){loadApprovals();return;}
+    if(e.target.closest('#refresh-pos')){loadPOs();return;}
+    const review=e.target.closest('[data-approve]');
+    if(review){
+      const approvalId=review.dataset.approve;
+      const decision=window.prompt('Enter APPROVED or REJECTED. This action is recorded in the audit log:');
+      if(!decision)return;
+      const normalized=decision.trim().toUpperCase();
+      if(!['APPROVED','REJECTED'].includes(normalized)){showNotice('Decision must be APPROVED or REJECTED.',true);return;}
+      const comments=window.prompt('Optional comments:')||'';
+      try{await callServer('decideApproval',{approvalId,decision:normalized,comments});showNotice('Approval recorded.');await loadApprovals();await loadDashboard();}
+      catch(err){showNotice(err.message,true);}
+    }
+  });
+  $('#request-form').addEventListener('submit',async e=>{
+    e.preventDefault();const form=e.currentTarget;
+    try{const result=await callServer('createRequest',formObject(form));closeDialog('request-dialog');form.reset();showNotice('Request '+result.requestNumber+' submitted.');await loadDashboard();showView('requests');}
+    catch(err){showNotice(err.message,true);}
+  });
+  $('#supplier-form').addEventListener('submit',async e=>{
+    e.preventDefault();const form=e.currentTarget;
+    try{const result=await callServer('createSupplier',formObject(form));closeDialog('supplier-dialog');form.reset();showNotice('Supplier '+result.supplierCode+' created.');await loadSuppliers();}
+    catch(err){showNotice(err.message,true);}
+  });
+  $$('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+  boot();
+})();
+</script>
